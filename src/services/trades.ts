@@ -2,9 +2,9 @@ import { prisma } from "../db.js";
 import type { Trade } from "@prisma/client";
 import { ListingStatus, MarketCurrency, TradeRole, TradeState } from "@prisma/client";
 import { bumpCompleted, bumpCancelled, bumpDispute, bumpDenial } from "./reputation.js";
+import { getNum } from "./settings.js";
 
-const ACCEPT_WINDOW_MS = 24 * 3600 * 1000; // prazo do vendedor aceitar
-const COMPLETE_WINDOW_MS = 48 * 3600 * 1000; // prazo de conclusão após aceite
+const HOUR_MS = 3600 * 1000; // prazos (aceite/conclusão) são ajustáveis no painel
 
 type Result<T = Trade> = { ok: true; trade: T } | { ok: false; reason: string };
 
@@ -22,7 +22,7 @@ export interface CreateTradeInput {
 
 export async function createTrade(input: CreateTradeInput): Promise<Trade> {
   const trade = await prisma.trade.create({
-    data: { ...input, state: TradeState.PENDING, expiresAt: new Date(Date.now() + ACCEPT_WINDOW_MS) },
+    data: { ...input, state: TradeState.PENDING, expiresAt: new Date(Date.now() + getNum("accept_window_hours") * HOUR_MS) },
   });
   await prisma.tradeEvent.create({
     data: { tradeId: trade.id, actorId: input.buyerId, toState: TradeState.PENDING, note: "solicitação criada" },
@@ -59,7 +59,7 @@ export async function acceptTrade(tradeId: string, accepterId: string): Promise<
 
   const updated = await prisma.trade.update({
     where: { id: tradeId },
-    data: { state: TradeState.ACCEPTED, acceptedAt: new Date(), expiresAt: new Date(Date.now() + COMPLETE_WINDOW_MS) },
+    data: { state: TradeState.ACCEPTED, acceptedAt: new Date(), expiresAt: new Date(Date.now() + getNum("complete_window_hours") * HOUR_MS) },
   });
   await prisma.tradeEvent.create({
     data: {

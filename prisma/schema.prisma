@@ -182,6 +182,13 @@ model GuildConfig {
   updatedAt DateTime @updatedAt
 }
 
+// Configurações numéricas/comportamento ajustáveis pelo painel web.
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
 // Textos do bot editáveis pelo painel web (override; fallback = default no código).
 model BotText {
   id        String   @id @default(cuid())

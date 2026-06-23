@@ -4,6 +4,8 @@ import { config } from "../config.js";
 import { listTexts, setText, TEXT_DEFS } from "../services/texts.js";
 import { getCommandsJSON } from "../bot/router.js";
 import { refreshAll } from "../bot/market/board.js";
+import { dashboard } from "../services/stats.js";
+import { listSettings, setSetting, SETTING_DEFS } from "../services/settings.js";
 
 // Basic Auth: usuário qualquer, senha = WEB_ADMIN_TOKEN.
 function basicAuth(req: Request, res: Response, next: NextFunction): void {
@@ -44,12 +46,47 @@ function commandsRef(): string {
 
 function banner(q: Request["query"]): string {
   if (q.deployed) return `<div class="ok">✅ ${esc(String(q.deployed))} comando(s) registrado(s) no Discord.</div>`;
+  if (q.settings) return `<div class="ok">✅ Configurações salvas.</div>`;
   if (q.saved)
     return `<div class="ok">✅ Salvo e aplicado! Painéis atualizados: ${esc(String(q.panels ?? 0))} · cards: ${esc(String(q.cards ?? 0))}.</div>`;
   return "";
 }
 
-function page(q: Request["query"]): string {
+function dashboardHtml(d: Awaited<ReturnType<typeof dashboard>>): string {
+  const card = (label: string, val: number | string) => `<div class="stat"><div class="n">${val}</div><div class="l">${label}</div></div>`;
+  const tr = (s: string) => d.trades[s] ?? 0;
+  return `<div class="stats">
+    ${card("Jogos ativos", `${d.gamesActive}/${d.games}`)}
+    ${card("Anúncios venda", d.sell)}
+    ${card("Anúncios compra", d.buy)}
+    ${card("Negociando", tr("ACCEPTED") + tr("IN_PROGRESS") + tr("PENDING"))}
+    ${card("Concluídas", tr("COMPLETED"))}
+    ${card("Disputas", tr("DISPUTED"))}
+    ${card("Avaliações", d.reviews)}
+    ${card("VIPs ativos", d.vips)}
+  </div>`;
+}
+
+function settingsHtml(): string {
+  const groups = [...new Set(SETTING_DEFS.map((d) => d.group))];
+  const body = groups
+    .map((g) => {
+      const items = listSettings()
+        .filter((s) => s.group === g)
+        .map(
+          (s) =>
+            `<div class="srow"><label for="${s.key}">${esc(s.label)} <span class="key">${s.key}</span></label>
+             <input type="number" step="any" id="${s.key}" name="${s.key}" value="${s.value}"></div>`,
+        )
+        .join("");
+      return `<div class="box"><b>${esc(g)}</b>${items}</div>`;
+    })
+    .join("");
+  return `<form method="post" action="settings">${body}<button type="submit">Salvar configurações</button></form>`;
+}
+
+async function page(q: Request["query"]): Promise<string> {
+  const d = await dashboard();
   const cards = listTexts()
     .map(
       (t) => `
@@ -82,12 +119,25 @@ function page(q: Request["query"]): string {
   code{background:#1e1f22;border:1px solid #444;border-radius:4px;padding:1px 5px;font-size:13px}
   .badge{background:#5865f2;color:#fff;font-size:11px;padding:1px 6px;border-radius:10px;vertical-align:middle}
   details summary{cursor:pointer;font-weight:bold;font-size:17px;margin-top:24px}
+  .stats{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+  .stat{background:#2b2d31;border-radius:8px;padding:12px 16px;min-width:110px;text-align:center}
+  .stat .n{font-size:22px;font-weight:bold}.stat .l{font-size:12px;color:#aaa}
+  .srow{margin:8px 0}.srow label{font-size:14px}.srow input{width:160px;background:#1e1f22;color:#eee;border:1px solid #444;border-radius:6px;padding:6px;font-size:14px}
 </style></head>
 <body>
   <h1>⚙️ StartzoneRMT — Painel</h1>
   ${banner(q)}
 
-  <details open>
+  <h2>📊 Visão geral</h2>
+  ${dashboardHtml(d)}
+
+  <details>
+    <summary>⚙️ Configurações do bot</summary>
+    <p class="muted">Ajuste o comportamento (pesos do ranking, bônus VIP, prazos). Vale imediatamente.</p>
+    ${settingsHtml()}
+  </details>
+
+  <details>
     <summary>📖 Comandos do bot (referência)</summary>
     <p class="muted">Todos os comandos disponíveis. <span class="badge">admin</span> = só administradores.</p>
     <div class="box">${commandsRef()}</div>
@@ -102,7 +152,16 @@ function page(q: Request["query"]): string {
 
 export const adminRouter = Router();
 adminRouter.use(basicAuth);
-adminRouter.get("/", (req, res) => res.send(page(req.query)));
+adminRouter.get("/", async (req, res) => res.send(await page(req.query)));
+
+adminRouter.post("/settings", urlencoded({ extended: false }), async (req, res) => {
+  for (const def of SETTING_DEFS) {
+    const raw = (req.body as Record<string, unknown>)[def.key];
+    const n = Number(raw);
+    if (typeof raw === "string" && Number.isFinite(n)) await setSetting(def.key, n);
+  }
+  res.redirect("./?settings=1");
+});
 
 adminRouter.post("/save", urlencoded({ extended: false }), async (req, res) => {
   for (const def of TEXT_DEFS) {

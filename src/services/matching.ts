@@ -2,6 +2,7 @@ import { prisma } from "../db.js";
 import type { Listing } from "@prisma/client";
 import { ListingStatus, ListingType, TradeRole, VipTier } from "@prisma/client";
 import { PRIOR_MEAN } from "./reputation.js";
+import { getNum } from "./settings.js";
 
 export type SortMode = "recommended" | "price" | "trust" | "fast";
 
@@ -15,12 +16,7 @@ export interface MatchResult {
   enoughStock: boolean;
 }
 
-// Pesos do score "Recomendado" (§3.3 do plano). Calibráveis.
-const W_REP = 0.4;
-const W_PRICE = 0.35;
-const W_COMPLETION = 0.15;
-const W_RECENCY = 0.05;
-const VIP_BONUS: Record<VipTier, number> = { KICK: 0.3, NITRO: 0.15 };
+// Pesos do score "Recomendado" são ajustáveis no painel (services/settings.ts).
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 
 export interface MatchParams {
@@ -83,6 +79,14 @@ export async function matchSellers(params: MatchParams): Promise<MatchResult[]> 
   const maxP = Math.max(...prices);
   const priceScore = (p: number) => (maxP === minP ? 1 : (maxP - p) / (maxP - minP));
 
+  // Pesos/bônus ajustáveis no painel.
+  const wRep = getNum("match_w_rep");
+  const wPrice = getNum("match_w_price");
+  const wCompletion = getNum("match_w_completion");
+  const wRecency = getNum("match_w_recency");
+  const vipBonus = (t: VipTier | null) =>
+    t === VipTier.KICK ? getNum("vip_bonus_kick") : t === VipTier.NITRO ? getNum("vip_bonus_nitro") : 0;
+
   const scored = candidates.map((c) => {
     const rep = repMap.get(c.userId);
     const ratingAvg = rep && rep.ratingCount > 0 ? rep.ratingSum / rep.ratingCount : null;
@@ -92,11 +96,11 @@ export async function matchSellers(params: MatchParams): Promise<MatchResult[]> 
     const vipTier = vipMap.get(c.userId) ?? null;
     const recency = Math.max(0, 1 - (now.getTime() - c.updatedAt.getTime()) / WEEK_MS);
     const composite =
-      W_REP * (repScore / 5) +
-      W_PRICE * priceScore(Number(c.pricePer1k)) +
-      W_COMPLETION * completionRate +
-      W_RECENCY * recency +
-      (vipTier ? VIP_BONUS[vipTier] : 0);
+      wRep * (repScore / 5) +
+      wPrice * priceScore(Number(c.pricePer1k)) +
+      wCompletion * completionRate +
+      wRecency * recency +
+      vipBonus(vipTier);
     return {
       result: {
         listing: c,

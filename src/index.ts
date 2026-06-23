@@ -10,6 +10,7 @@ import { registerVipEvents } from "./bot/vip/events.js";
 import { sweepExpiredVips } from "./services/vip.js";
 import { startWebServer } from "./web/server.js";
 import { loadTexts } from "./services/texts.js";
+import { loadSettings, getNum } from "./services/settings.js";
 import { refreshGiveawayRanking } from "./bot/giveaway/board.js";
 import { getActiveGiveaway, pendingDueForValidation, markEntry } from "./services/giveaways.js";
 import { ReferralStatus } from "@prisma/client";
@@ -29,11 +30,10 @@ import "./bot/market/flow.js";
 import "./bot/giveaway/commands.js";
 
 const SWEEP_INTERVAL_MS = 10 * 60 * 1000; // expira anúncios vencidos a cada 10 min
-const TICKET_TTL_MS = 60 * 60 * 1000; // apaga tickets fechados 1h após o fechamento
 
-// Apaga as threads de tickets de negociações já fechadas há um tempo.
+// Apaga as threads de tickets de negociações já fechadas há um tempo (ajustável no painel).
 async function cleanupClosedTickets() {
-  for (const t of await ticketsToCleanup(TICKET_TTL_MS)) {
+  for (const t of await ticketsToCleanup(getNum("ticket_cleanup_hours") * 3600 * 1000)) {
     const ch = await client.channels.fetch(t.ticketChannelId).catch(() => null);
     if (ch && ch.isThread()) await ch.delete().catch(() => {});
     await clearTicketChannel(t.id);
@@ -58,6 +58,7 @@ async function validateGiveawayEntries() {
 
 async function main() {
   await loadTexts();
+  await loadSettings();
   registerVipEvents();
   if (config.giveaway.enabled) registerGiveawayEvents();
   if (config.messageLog.enabled) registerTicketLogging();

@@ -36,6 +36,7 @@ import { getGuildConfig } from "../../services/guildConfig.js";
 import { submitReview, reviewCount } from "../../services/reputation.js";
 import { isBanned, isBlocked } from "../../services/moderation.js";
 import { text } from "../../services/texts.js";
+import { getNum } from "../../services/settings.js";
 import {
   MKT,
   panelMessage,
@@ -217,7 +218,7 @@ registerComponent(MKT, async (i, args, action) => {
       itemName,
       quantity: qty,
       pricePer1k: price,
-      minPerTrade: 1000, // sistema define 1k como mínimo por negociação
+      minPerTrade: getNum("min_per_trade"), // mínimo por negociação (ajustável no painel)
       currency: game.currency,
       ttlHours: game.listingTtlHours,
     });
