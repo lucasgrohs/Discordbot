@@ -1,0 +1,489 @@
+// Plataforma de Classificados RMT + Sorteio por Indicação — modelo de dados.
+// Veja PLANO_RMT_BOT.md para o desenho do produto. O núcleo é a negociação (Trade).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum TradeUnit {
+  DIAMOND
+  GOLD
+  ITEM
+  OTHER
+}
+
+enum MarketCurrency {
+  BRL
+  USD
+}
+
+// Status do marketplace de um jogo (allowlist — §8 do plano).
+enum MarketStatus {
+  ENABLED
+  SUSPENDED
+  CLOSED
+}
+
+enum ListingType {
+  SELL // VENDO
+  BUY // COMPRO (ordem de compra persistente, opcional)
+}
+
+enum ListingStatus {
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CLOSED
+}
+
+// Máquina de estados da negociação — §2 do plano.
+enum TradeState {
+  PENDING // comprador solicitou, aguardando o vendedor aceitar
+  ACCEPTED // vendedor aceitou; estoque reservado
+  IN_PROGRESS
+  COMPLETED // concluída pelos dois lados → libera avaliação
+  CANCELLED
+  DISPUTED
+  EXPIRED
+}
+
+enum TradeRole {
+  BUYER
+  SELLER
+}
+
+// Origem do VIP (bônus de posicionamento, não prioridade absoluta — §3.3/§4).
+enum VipTier {
+  KICK // Tier 1 — assinatura na Kick
+  NITRO // Tier 2 — Boost no servidor
+}
+
+enum CaseStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum SanctionType {
+  WARNING
+  SUSPENSION
+  BAN
+}
+
+enum SanctionScope {
+  GAME
+  GLOBAL
+}
+
+enum ReferralStatus {
+  PENDING
+  VALID
+  INVALID
+}
+
+enum GiveawayStatus {
+  DRAFT
+  RUNNING
+  ENDED
+}
+
+enum GiveawayMode {
+  TOP1
+  TOP3
+  TOP10
+  RANDOM_VALID // sorteio aleatório entre indicações válidas
+  TOP30_RANDOM // sorteio dentro do TOP 30
+  MIXED // ranking + aleatório
+}
+
+// ============================================================================
+// Catálogo / administração (§1, §8)
+// ============================================================================
+
+model Game {
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  name      String
+  emoji     String?
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  // Config de marketplace
+  marketplaceEnabled Boolean        @default(false)
+  marketStatus       MarketStatus   @default(ENABLED)
+  tradeUnit          TradeUnit      @default(DIAMOND) // o que é comercializado
+  baseQuantity       Int            @default(1000) // 100 / 1.000 / 1.000.000
+  currency           MarketCurrency @default(BRL)
+  channelId          String? // sala "negocie" (painel COMPRO/VENDO)
+  riskNotice         String? // aviso de risco específico do jogo
+  listingTtlHours    Int            @default(48) // expiração padrão dos anúncios
+
+  // Estrutura de salas por jogo (categoria + sub-salas)
+  categoryId       String?
+  sellChannelId    String? // anúncios-de-venda
+  buyChannelId     String? // anúncios-de-compra
+  rankingChannelId String? // ranking
+  chatChannelId    String? // chat-livre
+  rankingMessageId String? // mensagem de ranking mantida pelo bot
+
+  servers  GameServer[]
+  listings Listing[]
+  trades   Trade[]
+
+  createdAt DateTime @default(now())
+}
+
+// Servidores/regiões de um jogo — viram os botões do anúncio (§3.1, §8).
+model GameServer {
+  id        String  @id @default(cuid())
+  gameId    String
+  game      Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  name      String
+  region    String?
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  listings Listing[]
+  trades   Trade[]
+
+  createdAt DateTime @default(now())
+
+  @@index([gameId])
+}
+
+// Config por servidor do Discord (cargos VIP, canais) — §1, §4, §7.
+model GuildConfig {
+  id               String   @id @default(cuid())
+  guildId          String   @unique
+  vipTier1RoleId   String? // cargo concedido por sub na Kick (Tier 1)
+  vipTier2RoleId   String? // cargo de Booster/Nitro (Tier 2)
+  staffChannelId   String?
+  logChannelId     String? // canal de auditoria
+  disputeChannelId String?
+
+  // Categoria/salas do sorteio (§9)
+  giveawayCategoryId       String?
+  giveawayActiveChannelId  String? // sorteios-ativos (abertura)
+  giveawayGuestsChannelId  String? // convidados (feed de quem entrou)
+  giveawayRankingChannelId String? // ranking (mensagem mantida)
+  giveawayWinnersChannelId String? // ganhadores (histórico)
+  giveawayRankingMessageId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Trilha de auditoria das ações administrativas — §1.
+model AuditLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  actorId   String // admin que executou
+  action    String // ex.: "game.create", "server.remove"
+  target    String? // id/nome da entidade afetada
+  details   String? // contexto adicional
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// ============================================================================
+// Anúncios e estoque (§3)
+// ============================================================================
+
+model Listing {
+  id     String      @id @default(cuid())
+  type   ListingType
+  userId String // discord id do anunciante
+
+  gameId   String
+  game     Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  serverId String
+  server   GameServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  itemName String? // quando o jogo comercializa itens
+
+  // Ciclo de vida do estoque (§3.2)
+  quantityTotal     Int
+  quantityAvailable Int
+  minPerTrade       Int            @default(1)
+  maxPerTrade       Int?
+  pricePer1k        Decimal        @db.Decimal(12, 2)
+  currency          MarketCurrency @default(BRL)
+
+  status         ListingStatus @default(ACTIVE)
+  boardMessageId String? // id do card no canal de anúncios
+  trades         Trade[]
+  createdAt      DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  renewedAt DateTime?
+  expiresAt DateTime?
+
+  @@index([gameId, serverId, type, status])
+  @@index([userId])
+  @@index([status, expiresAt])
+}
+
+// ============================================================================
+// Negociação — entidade central (§2)
+// ============================================================================
+
+model Trade {
+  id        String  @id @default(cuid())
+  guildId   String
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  buyerId  String
+  sellerId String
+
+  gameId   String
+  game     Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  serverId String
+  server   GameServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  quantity   Int
+  pricePer1k Decimal        @db.Decimal(12, 2)
+  currency   MarketCurrency @default(BRL)
+
+  state           TradeState @default(PENDING)
+  ticketChannelId String? // canal privado da negociação (§6)
+
+  // Conclusão mútua — a avaliação só abre quando os dois confirmam (§2, §5.1)
+  buyerCompleted  Boolean @default(false)
+  sellerCompleted Boolean @default(false)
+  cancelReason    String?
+
+  createdAt   DateTime  @default(now())
+  acceptedAt  DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  expiresAt   DateTime? // timeout p/ aceite e p/ conclusão
+
+  events  TradeEvent[]
+  reviews Review[]
+  dispute Dispute?
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([state])
+  @@index([listingId])
+}
+
+// Transcrição das mensagens do ticket (preserva a conversa contra exclusões).
+model TicketMessage {
+  id        String   @id @default(cuid())
+  tradeId   String
+  authorId  String
+  authorTag String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([tradeId, createdAt])
+}
+
+// Histórico de mudanças de estado (auditoria — §2, §6).
+model TradeEvent {
+  id        String      @id @default(cuid())
+  tradeId   String
+  trade     Trade       @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  actorId   String? // null = sistema
+  fromState TradeState?
+  toState   TradeState
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@index([tradeId])
+}
+
+// ============================================================================
+// Reputação e ranking (§5)
+// ============================================================================
+
+// Avaliação dos dois lados; só existe após Trade.COMPLETED.
+model Review {
+  id      String @id @default(cuid())
+  tradeId String
+  trade   Trade  @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  raterId   String // quem avalia
+  rateeId   String // quem é avaliado
+  rateeRole TradeRole // papel do avaliado na negociação
+  rating    Int // 1..5
+  comment   String?
+  createdAt DateTime  @default(now())
+
+  @@unique([tradeId, raterId])
+  @@index([rateeId])
+}
+
+// Agregado de reputação por usuário e papel (BUYER/SELLER) — alimenta o ranking.
+// `score` é a nota com encolhimento estatístico (bayesiano/Wilson — §5.3).
+model UserReputation {
+  id              String    @id @default(cuid())
+  userId          String
+  role            TradeRole
+  completedTrades Int       @default(0)
+  cancelledTrades Int       @default(0)
+  disputes        Int       @default(0)
+  ratingSum       Int       @default(0)
+  ratingCount     Int       @default(0)
+  denialCount     Int       @default(0) // recusa/trava em contatos registrados
+  noShowCount     Int       @default(0)
+  score           Float     @default(0)
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId, role])
+  @@index([role, score])
+}
+
+// ============================================================================
+// VIP / integração Kick (§4)
+// ============================================================================
+
+model VipGrant {
+  id        String    @id @default(cuid())
+  userId    String
+  tier      VipTier
+  source    String // "kick" | "nitro"
+  active    Boolean   @default(true)
+  grantedAt DateTime  @default(now())
+  expiresAt DateTime? // Kick: validade da sub; Nitro: null (removido por evento)
+  revokedAt DateTime?
+
+  @@unique([userId, tier])
+  @@index([active, tier])
+}
+
+// Vínculo OAuth Kick ↔ Discord. Tokens guardados criptografados (§4, §10).
+model KickLink {
+  id             String    @id @default(cuid())
+  discordUserId  String    @unique
+  kickUserId     String    @unique
+  kickUsername   String?
+  accessToken    String? // criptografado em repouso
+  refreshToken   String? // criptografado em repouso
+  tokenExpiresAt DateTime?
+  linkedAt       DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ============================================================================
+// Moderação / antifraude (§7)
+// ============================================================================
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+}
+
+model Report {
+  id         String     @id @default(cuid())
+  reporterId String
+  reportedId String
+  tradeId    String? // referência solta (sem FK)
+  reason     String
+  status     CaseStatus @default(OPEN)
+  resolution String?
+  resolvedBy String?
+  createdAt  DateTime   @default(now())
+  resolvedAt DateTime?
+
+  @@index([reportedId])
+  @@index([status])
+}
+
+model Sanction {
+  id        String        @id @default(cuid())
+  userId    String
+  type      SanctionType
+  scope     SanctionScope @default(GLOBAL)
+  gameId    String? // referência solta quando scope = GAME
+  reason    String
+  issuedBy  String
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  expiresAt DateTime?
+
+  @@index([userId, active])
+}
+
+// Disputa de uma negociação. Comprovantes só aqui, com retenção curta (§6, §10).
+model Dispute {
+  id         String     @id @default(cuid())
+  tradeId    String     @unique
+  trade      Trade      @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  openedBy   String
+  reason     String?
+  status     CaseStatus @default(OPEN)
+  proofUrls  String[]   @default([]) // limpos por job após o prazo
+  resolvedBy String?
+  resolution String?
+  createdAt  DateTime   @default(now())
+  resolvedAt DateTime?
+}
+
+// ============================================================================
+// Sorteio por indicação (§9)
+// ============================================================================
+
+model Giveaway {
+  id        String         @id @default(cuid())
+  guildId   String
+  title     String
+  channelId String
+  mode      GiveawayMode   @default(TOP10)
+  status    GiveawayStatus @default(DRAFT)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  winnerIds String[]       @default([])
+
+  // Regras de qualificação (§9)
+  minAccountAgeDays Int @default(7)
+  minStayDays       Int @default(3)
+
+  codes     ReferralCode[]
+  entries   ReferralEntry[]
+  createdAt DateTime        @default(now())
+}
+
+model ReferralCode {
+  id         String   @id @default(cuid())
+  giveawayId String
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  ownerId    String // discord id do indicador
+  code       String   @unique
+  inviteCode String? // código de convite do Discord, se gerado
+  createdAt  DateTime @default(now())
+
+  @@unique([giveawayId, ownerId])
+}
+
+model ReferralEntry {
+  id            String         @id @default(cuid())
+  giveawayId    String
+  giveaway      Giveaway       @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  referrerId    String
+  invitedUserId String
+  status        ReferralStatus @default(PENDING)
+  reason        String? // motivo de invalidação ou regra que validou
+  joinedAt      DateTime       @default(now())
+  validatedAt   DateTime?
+
+  @@unique([giveawayId, invitedUserId])
+  @@index([giveawayId, referrerId, status])
+}

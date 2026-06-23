@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shopbot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: shopbot
+    ports:
+      - "5434:5432"
+    volumes:
+      - shopbot_pgdata:/var/lib/postgresql/data
+
+  bot:
+    build: .
+    container_name: shopbot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Usa o Postgres da rede do compose (sobrepõe o DATABASE_URL local do .env).
+      DATABASE_URL: postgresql://shop:shop@postgres:5432/shopbot
+    depends_on:
+      - postgres
+    ports:
+      - "8787:8787" # endpoints Kick (/kick/callback e /kick/webhook), atrás do nginx em produção
+
+volumes:
+  shopbot_pgdata:
