@@ -108,6 +108,34 @@ export const TEXT_DEFS: TextDef[] = [
     placeholders: ["{invited}", "{referrer}", "{total}"],
     default: "✨ <@{invited}> chegou por indicação de <@{referrer}>! ({total} convidado(s))",
   },
+  // --- Títulos de embeds ---
+  { key: "results_title", label: "Título — resultados do COMPRO", placeholders: ["{game}"], default: "🛒 Melhores vendedores — {game}" },
+  { key: "sell_card_author", label: "Cabeçalho — card de venda", placeholders: [], default: "🏷️ Anúncio de venda" },
+  { key: "buy_card_author", label: "Cabeçalho — card de compra", placeholders: [], default: "🛒 Pedido de compra" },
+  { key: "request_title", label: "Título — solicitação de negociação", placeholders: [], default: "🤝 Nova solicitação de negociação" },
+  { key: "ticket_title", label: "Título — ticket em andamento", placeholders: [], default: "🧾 Negociação em andamento" },
+  { key: "ticket_completed_title", label: "Título — negociação concluída", placeholders: [], default: "🎉 Negociação concluída" },
+  { key: "ticket_disputed_title", label: "Título — disputa aberta", placeholders: [], default: "⚠️ Disputa aberta" },
+  { key: "restock_title", label: "Título — DM de estoque esgotado", placeholders: [], default: "📦 Seu estoque acabou!" },
+  // --- Confirmações ---
+  {
+    key: "nego_sent",
+    label: "Confirmação — solicitação enviada",
+    placeholders: [],
+    default: "✅ Solicitação enviada ao vendedor. Você entra no ticket assim que ele aceitar.",
+  },
+  {
+    key: "trade_cancelled",
+    label: "Confirmação — negociação cancelada",
+    placeholders: [],
+    default: "🚫 Negociação cancelada. O estoque reservado foi devolvido.",
+  },
+  {
+    key: "rating_thanks",
+    label: "Confirmação — avaliação registrada",
+    placeholders: ["{rating}"],
+    default: "✅ Avaliação de **{rating}★** registrada. Obrigado!",
+  },
 ];
 
 const cache = new Map<string, string>();

@@ -163,7 +163,7 @@ export function resultsMessage(
 ) {
   const embed = new EmbedBuilder()
     .setColor(0x2b9348)
-    .setTitle(`🛒 Melhores vendedores — ${game.name}`)
+    .setTitle(text("results_title", { game: game.name }))
     .setDescription(
       `Servidor **${server.name}** · procurando **${fmtQty(quantity)}** · ordenado por **${SORT_LABEL[sort]}**`,
     );
@@ -270,7 +270,7 @@ export function cardNegoModal(listingId: string, baseQuantity: number): ModalBui
 export function sellCardMessage(listing: Listing, game: Game, serverName: string) {
   const embed = new EmbedBuilder()
     .setColor(0x2b9348)
-    .setAuthor({ name: "🏷️ Anúncio de venda" })
+    .setAuthor({ name: text("sell_card_author") })
     .setDescription(
       [
         `**Vendedor:** <@${listing.userId}>`,
@@ -289,7 +289,7 @@ export function sellCardMessage(listing: Listing, game: Game, serverName: string
 export function buyCardMessage(listing: Listing, game: Game, serverName: string) {
   const embed = new EmbedBuilder()
     .setColor(0x4361ee)
-    .setAuthor({ name: "🛒 Pedido de compra" })
+    .setAuthor({ name: text("buy_card_author") })
     .setDescription(
       [
         `**Comprador:** <@${listing.userId}>`,
@@ -406,7 +406,7 @@ export function requestMessage(trade: Trade, game: Game, serverName: string, ite
   const initiatorId = trade.buyerId === ownerId ? trade.sellerId : trade.buyerId;
   const ownerIsSeller = trade.sellerId === ownerId;
   const embed = new EmbedBuilder()
-    .setTitle("🤝 Nova solicitação de negociação")
+    .setTitle(text("request_title"))
     .setColor(0xf9c74f)
     .setDescription(
       [
@@ -439,7 +439,7 @@ export function restockReminder(listing: Listing, game: Game, serverName: string
   return {
     embeds: [
       new EmbedBuilder()
-        .setTitle("📦 Seu estoque acabou!")
+        .setTitle(text("restock_title"))
         .setColor(0x2b9348)
         .setDescription(text("restock_message", { what, server: serverName }))
         .setFooter({ text: `${game.name} · reputação mantida` }),
@@ -459,7 +459,7 @@ export function requestRefusedMessage() {
 export function ticketMessage(trade: Trade, game: Game, serverName: string) {
   const check = (done: boolean) => (done ? "✅" : "⬜");
   const embed = new EmbedBuilder()
-    .setTitle("🧾 Negociação em andamento")
+    .setTitle(text("ticket_title"))
     .setColor(0x4361ee)
     .setDescription(
       [
@@ -484,7 +484,7 @@ export function ticketMessage(trade: Trade, game: Game, serverName: string) {
 
 export function ticketCompletedMessage(tradeId: string) {
   const embed = new EmbedBuilder()
-    .setTitle("🎉 Negociação concluída")
+    .setTitle(text("ticket_completed_title"))
     .setColor(0x2b9348)
     .setDescription(text("ticket_completed"));
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -516,11 +516,7 @@ export function ticketCancelledMessage(reason: string) {
 }
 
 export function ticketDisputedMessage() {
-  return infoEmbed(
-    "⚠️ Disputa aberta",
-    text("ticket_disputed"),
-    0xe63946,
-  );
+  return infoEmbed(text("ticket_disputed_title"), text("ticket_disputed"), 0xe63946);
 }
 
 export function disputeAlert(trade: Trade, game: Game) {

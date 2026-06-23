@@ -147,7 +147,7 @@ async function startNegotiation(
   }
   await i.reply({
     content: delivered
-      ? "✅ Solicitação enviada ao vendedor. Você entra no ticket assim que ele aceitar."
+      ? text("nego_sent")
       : "⚠️ Não consegui avisar o vendedor (DM fechada e canal indisponível). Tente outro vendedor.",
     flags: EPH,
   });
@@ -494,7 +494,7 @@ registerComponent(MKT, async (i, args, action) => {
       return;
     }
     await syncListingCard(res.trade.listingId);
-    await i.reply({ content: "🚫 Negociação cancelada. O estoque reservado foi devolvido.", flags: EPH });
+    await i.reply({ content: text("trade_cancelled"), flags: EPH });
     if (res.trade.ticketChannelId) {
       const ch = await client.channels.fetch(res.trade.ticketChannelId).catch(() => null);
       if (ch?.isThread()) await ch.delete().catch(() => {});
@@ -580,7 +580,7 @@ registerComponent(MKT, async (i, args, action) => {
     const comment = i.fields.getTextInputValue("comment") || null;
     const res = await submitReview({ tradeId, raterId: i.user.id, rateeId, rateeRole, rating, comment });
     await i.reply({
-      content: res.ok ? `✅ Avaliação de **${rating}★** registrada. Obrigado!` : `⚠️ ${res.reason}`,
+      content: res.ok ? text("rating_thanks", { rating }) : `⚠️ ${res.reason}`,
       flags: EPH,
     });
     if (res.ok) {
