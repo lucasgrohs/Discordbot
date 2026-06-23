@@ -3,7 +3,7 @@ import type { Giveaway } from "@prisma/client";
 import { client } from "../client.js";
 import { getGuildConfig, updateGuildConfig } from "../../services/guildConfig.js";
 import { getActiveGiveaway, topReferrers, entryStats, listReferralCodes } from "../../services/giveaways.js";
-import { giveawayRankingBoard, winnersRecordMessage } from "./render.js";
+import { giveawayRankingBoard, winnersRecordMessage, giveawayKickoffMessage } from "./render.js";
 
 const CH = {
   active: "sorteios-ativos",
@@ -114,6 +114,31 @@ export async function clearGiveawayActive(guildId: string): Promise<void> {
 export async function clearGiveawayGuests(guildId: string): Promise<void> {
   const cfg = await getGuildConfig(guildId);
   await clearBotMessages(cfg.giveawayGuestsChannelId);
+}
+
+// Re-renderiza a mensagem de abertura do sorteio ativo (após editar textos).
+export async function refreshActiveKickoff(): Promise<void> {
+  for (const guild of client.guilds.cache.values()) {
+    const cfg = await getGuildConfig(guild.id);
+    const ch = await fetchTextChannel(cfg.giveawayActiveChannelId);
+    if (!ch) continue;
+    const giveaway = await getActiveGiveaway(guild.id);
+    if (!giveaway) continue;
+    const msgs = await ch.messages.fetch({ limit: 20 }).catch(() => null);
+    if (!msgs) continue;
+    for (const msg of msgs.values()) {
+      if (msg.author.id !== client.user?.id) continue;
+      const isKickoff = msg.components.some((row) =>
+        ((row as { components?: { customId?: string | null }[] }).components ?? []).some((c) =>
+          c.customId?.startsWith("gv:link"),
+        ),
+      );
+      if (isKickoff) {
+        await msg.edit(giveawayKickoffMessage(giveaway)).catch(() => {});
+        break;
+      }
+    }
+  }
 }
 
 // Posta o registro de um sorteio encerrado no canal ganhadores.

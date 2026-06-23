@@ -41,6 +41,10 @@ export function getListing(id: string): Promise<Listing | null> {
   return prisma.listing.findUnique({ where: { id } });
 }
 
+export function listAllActiveListings(): Promise<Listing[]> {
+  return prisma.listing.findMany({ where: { status: ListingStatus.ACTIVE } });
+}
+
 export function listUserListings(userId: string): Promise<Listing[]> {
   return prisma.listing.findMany({
     where: { userId, status: { not: ListingStatus.CLOSED } },

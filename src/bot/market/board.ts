@@ -2,9 +2,10 @@ import { ChannelType, Guild, TextChannel } from "discord.js";
 import type { Game, Listing } from "@prisma/client";
 import { TradeRole } from "@prisma/client";
 import { client } from "../client.js";
-import { getGame, updateGame } from "../../services/games.js";
+import { getGame, updateGame, listGames } from "../../services/games.js";
 import { getServer } from "../../services/servers.js";
-import { getListing, setBoardMessage, activeSellersForGame } from "../../services/listings.js";
+import { getListing, setBoardMessage, activeSellersForGame, listAllActiveListings } from "../../services/listings.js";
+import { refreshActiveKickoff } from "../giveaway/board.js";
 import { getReputation } from "../../services/reputation.js";
 import { MKT, panelMessage, sellCardMessage, buyCardMessage, gameRankingMessage } from "./render.js";
 
@@ -142,6 +143,44 @@ export async function cleanupNegocie(game: Game): Promise<number> {
     }
   }
   return removed;
+}
+
+// Acha e re-renderiza o painel COMPRO/VENDO no canal do jogo.
+async function editPanel(game: { id: string; channelId: string | null }): Promise<boolean> {
+  const ch = await fetchTextChannel(game.channelId);
+  if (!ch) return false;
+  const msgs = await ch.messages.fetch({ limit: 50 }).catch(() => null);
+  if (!msgs) return false;
+  const full = await getGame(game.id);
+  if (!full) return false;
+  for (const msg of msgs.values()) {
+    if (msg.author.id !== client.user?.id) continue;
+    const isPanel = msg.components.some((row) =>
+      ((row as { components?: { customId?: string | null }[] }).components ?? []).some((c) =>
+        c.customId?.startsWith(`${MKT}:buy:`),
+      ),
+    );
+    if (isPanel) {
+      await msg.edit(panelMessage(full)).catch(() => {});
+      return true;
+    }
+  }
+  return false;
+}
+
+// Re-renderiza painéis, cards e a abertura do sorteio (após editar textos no painel web).
+export async function refreshAll(): Promise<{ panels: number; cards: number }> {
+  let panels = 0;
+  let cards = 0;
+  for (const g of await listGames()) {
+    if (g.channelId && (await editPanel(g))) panels++;
+  }
+  for (const l of await listAllActiveListings()) {
+    await syncListingCard(l.id);
+    cards++;
+  }
+  await refreshActiveKickoff().catch(() => {});
+  return { panels, cards };
 }
 
 // Atualiza a mensagem de ranking da sala do jogo.
