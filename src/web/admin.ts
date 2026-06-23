@@ -23,6 +23,25 @@ function basicAuth(req: Request, res: Response, next: NextFunction): void {
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+// Lista de referência dos comandos do bot (gerada a partir dos comandos registrados).
+function commandsRef(): string {
+  type Cmd = { name: string; description?: string; default_member_permissions?: string | null; options?: Opt[] };
+  type Opt = { type: number; name: string; description?: string };
+  const cmds = (getCommandsJSON() as Cmd[]).slice().sort((a, b) => a.name.localeCompare(b.name));
+  return cmds
+    .map((c) => {
+      const admin = c.default_member_permissions ? ' <span class="badge">admin</span>' : "";
+      const subs = (c.options ?? []).filter((o) => o.type === 1); // 1 = subcomando
+      const head = `<b>/${esc(c.name)}</b>${admin} <span class="muted">${esc(c.description ?? "")}</span>`;
+      if (!subs.length) return `<div class="cmd">${head}</div>`;
+      const items = subs
+        .map((s) => `<li><code>/${esc(c.name)} ${esc(s.name)}</code> — ${esc(s.description ?? "")}</li>`)
+        .join("");
+      return `<div class="cmd">${head}<ul>${items}</ul></div>`;
+    })
+    .join("");
+}
+
 function banner(q: Request["query"]): string {
   if (q.deployed) return `<div class="ok">✅ ${esc(String(q.deployed))} comando(s) registrado(s) no Discord.</div>`;
   if (q.saved)
@@ -57,16 +76,23 @@ function page(q: Request["query"]): string {
   .ok{background:#2b9348;padding:10px 14px;border-radius:6px;margin-bottom:12px}
   .box{background:#2b2d31;border-radius:8px;padding:14px;margin:12px 0}
   .muted{color:#aaa;font-size:13px}
+  .cmd{padding:8px 0;border-bottom:1px solid #3a3c42}
+  .cmd ul{margin:6px 0 0;padding-left:18px}
+  .cmd li{margin:2px 0;font-size:14px}
+  code{background:#1e1f22;border:1px solid #444;border-radius:4px;padding:1px 5px;font-size:13px}
+  .badge{background:#5865f2;color:#fff;font-size:11px;padding:1px 6px;border-radius:10px;vertical-align:middle}
+  details summary{cursor:pointer;font-weight:bold;font-size:17px;margin-top:24px}
 </style></head>
 <body>
   <h1>⚙️ StartzoneRMT — Painel</h1>
   ${banner(q)}
 
-  <div class="box">
-    <b>Comandos do Discord</b>
-    <p class="muted">Registra/atualiza os slash commands do bot neste servidor. Rode após adicionar comandos novos ou se algum sumir.</p>
-    <form method="post" action="deploy-commands"><button class="alt" type="submit">Registrar comandos no Discord</button></form>
-  </div>
+  <details open>
+    <summary>📖 Comandos do bot (referência)</summary>
+    <p class="muted">Todos os comandos disponíveis. <span class="badge">admin</span> = só administradores.</p>
+    <div class="box">${commandsRef()}</div>
+    <form method="post" action="deploy-commands"><button class="alt" type="submit">↻ Re-registrar comandos</button></form>
+  </details>
 
   <h2>💬 Mensagens do bot</h2>
   <p class="muted">Edite e salve — o bot aplica nas próximas mensagens E atualiza as já postadas (painel, cards, abertura do sorteio).</p>
