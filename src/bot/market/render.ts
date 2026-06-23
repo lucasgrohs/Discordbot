@@ -297,7 +297,7 @@ export function buyCardMessage(listing: Listing, game: Game, serverName: string)
         `**Procura:** ${fmtQty(listing.quantityAvailable)}`,
         `**Paga até:** ${fmtMoney(Number(listing.pricePer1k), listing.currency)}/1k`,
         "",
-        "_Tem o que ele procura? Clique em **Vender para ele**._",
+        text("buy_card_hint"),
       ].join("\n"),
     );
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -420,7 +420,7 @@ export function requestMessage(trade: Trade, game: Game, serverName: string, ite
           : "Ao **aceitar**, abrimos um ticket privado para combinarem a entrega.",
       ].join("\n"),
     )
-    .setFooter({ text: "Aceite confirma que a negociação existe — depois disso você não nega que ela aconteceu." });
+    .setFooter({ text: text("request_footer") });
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(buildId(MKT, "accept", trade.id)).setLabel("Aceitar").setStyle(ButtonStyle.Success).setEmoji("✅"),
@@ -441,17 +441,7 @@ export function restockReminder(listing: Listing, game: Game, serverName: string
       new EmbedBuilder()
         .setTitle("📦 Seu estoque acabou!")
         .setColor(0x2b9348)
-        .setDescription(
-          [
-            `Parabéns pela venda! 🎉 Seu anúncio de ${what} (servidor **${serverName}**) foi **totalmente vendido** e encerrado automaticamente.`,
-            "",
-            "**Quer continuar vendendo?**",
-            "• Reabra um anúncio pelo painel **🏷️ VENDO** no canal de negociação.",
-            "• Gerencie tudo em `/anuncios`.",
-            "",
-            "💎 Vendedores **VIP** (Kick/Booster) aparecem no topo e vendem mais rápido — fale com a staff.",
-          ].join("\n"),
-        )
+        .setDescription(text("restock_message", { what, server: serverName }))
         .setFooter({ text: `${game.name} · reputação mantida` }),
     ],
   };
@@ -477,12 +467,12 @@ export function ticketMessage(trade: Trade, game: Game, serverName: string) {
         `**Jogo:** ${game.name} · **Servidor:** ${serverName}`,
         `**Quantidade:** ${fmtQty(trade.quantity)} · **Preço/1k:** ${fmtMoney(Number(trade.pricePer1k), trade.currency)}`,
         "",
-        "Combinem a entrega por aqui. Quando concluírem, **os dois** clicam em **Concluir**.",
+        text("ticket_instructions"),
         "",
         `${check(trade.buyerCompleted)} Comprador confirmou · ${check(trade.sellerCompleted)} Vendedor confirmou`,
       ].join("\n"),
     )
-    .setFooter({ text: "A avaliação abre quando os dois confirmarem a conclusão." });
+    .setFooter({ text: text("ticket_footer") });
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(buildId(MKT, "complete", trade.id)).setLabel("Concluir").setStyle(ButtonStyle.Success).setEmoji("✅"),
@@ -496,7 +486,7 @@ export function ticketCompletedMessage(tradeId: string) {
   const embed = new EmbedBuilder()
     .setTitle("🎉 Negociação concluída")
     .setColor(0x2b9348)
-    .setDescription("Os dois lados confirmaram. Obrigado!\n\n**Avalie o outro lado** (clique nas estrelas):");
+    .setDescription(text("ticket_completed"));
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     [1, 2, 3, 4, 5].map((n) =>
       new ButtonBuilder().setCustomId(buildId(MKT, "rate", tradeId, n)).setLabel(String(n)).setEmoji("⭐").setStyle(ButtonStyle.Secondary),
@@ -528,7 +518,7 @@ export function ticketCancelledMessage(reason: string) {
 export function ticketDisputedMessage() {
   return infoEmbed(
     "⚠️ Disputa aberta",
-    "A equipe foi acionada e vai analisar o caso. O estoque permanece reservado até a resolução.",
+    text("ticket_disputed"),
     0xe63946,
   );
 }

@@ -52,6 +52,62 @@ export const TEXT_DEFS: TextDef[] = [
       "Regras: conta com no mínimo **{minAccountAgeDays} dia(s)** · permanência mínima de **{minStayDays} dia(s)**.",
     ].join("\n"),
   },
+  {
+    key: "request_footer",
+    label: "Negociação — rodapé da solicitação",
+    placeholders: [],
+    default: "Aceite confirma que a negociação existe — depois disso você não nega que ela aconteceu.",
+  },
+  {
+    key: "ticket_instructions",
+    label: "Ticket — instruções de conclusão",
+    placeholders: [],
+    default: "Combinem a entrega por aqui. Quando concluírem, **os dois** clicam em **Concluir**.",
+  },
+  {
+    key: "ticket_footer",
+    label: "Ticket — rodapé",
+    placeholders: [],
+    default: "A avaliação abre quando os dois confirmarem a conclusão.",
+  },
+  {
+    key: "ticket_completed",
+    label: "Ticket — negociação concluída",
+    placeholders: [],
+    default: "Os dois lados confirmaram. Obrigado!\n\n**Avalie o outro lado** (clique nas estrelas):",
+  },
+  {
+    key: "ticket_disputed",
+    label: "Ticket — disputa aberta",
+    placeholders: [],
+    default: "A equipe foi acionada e vai analisar o caso. O estoque permanece reservado até a resolução.",
+  },
+  {
+    key: "buy_card_hint",
+    label: "Card de pedido de compra — dica",
+    placeholders: [],
+    default: "_Tem o que ele procura? Clique em **Vender para ele**._",
+  },
+  {
+    key: "restock_message",
+    label: "DM de estoque esgotado (reestoque)",
+    placeholders: ["{what}", "{server}"],
+    default: [
+      "Parabéns pela venda! 🎉 Seu anúncio de {what} (servidor **{server}**) foi **totalmente vendido** e encerrado automaticamente.",
+      "",
+      "**Quer continuar vendendo?**",
+      "• Reabra um anúncio pelo painel **🏷️ VENDO** no canal de negociação.",
+      "• Gerencie tudo em `/anuncios`.",
+      "",
+      "💎 Vendedores **VIP** (Kick/Booster) aparecem no topo e vendem mais rápido — fale com a staff.",
+    ].join("\n"),
+  },
+  {
+    key: "giveaway_join",
+    label: "Sorteio — aviso de chegada por indicação",
+    placeholders: ["{invited}", "{referrer}", "{total}"],
+    default: "✨ <@{invited}> chegou por indicação de <@{referrer}>! ({total} convidado(s))",
+  },
 ];
 
 const cache = new Map<string, string>();

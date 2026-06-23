@@ -4,6 +4,7 @@ import { initGuildInvites, onInviteCreate, onInviteDelete, detectUsedInvite } fr
 import { refreshGiveawayRanking } from "./board.js";
 import { getGuildConfig } from "../../services/guildConfig.js";
 import { getActiveGiveaway, recordEntry, invalidateEntryOnLeave } from "../../services/giveaways.js";
+import { text } from "../../services/texts.js";
 
 export function registerGiveawayEvents(): void {
   client.once(Events.ClientReady, async () => {
@@ -38,9 +39,8 @@ export function registerGiveawayEvents(): void {
             : res.status === "PENDING"
               ? " _(pendente até cumprir a permanência mínima)_"
               : "";
-        await ch.send(
-          `✨ <@${member.id}> chegou por indicação de <@${res.referrerId}>! (${res.total} convidado(s))${note}`,
-        );
+        const msg = text("giveaway_join", { invited: member.id, referrer: res.referrerId, total: res.total });
+        await ch.send(`${msg}${note}`);
       }
       await refreshGiveawayRanking(member.guild.id);
     } catch (err) {
