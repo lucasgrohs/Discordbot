@@ -11,6 +11,7 @@ import {
 import type { Game, GameServer, Listing, MarketCurrency, Trade, TradeUnit, UserReputation } from "@prisma/client";
 import { buildId } from "../customId.js";
 import type { MatchResult, SortMode } from "../../services/matching.js";
+import { text } from "../../services/texts.js";
 
 export const MKT = "mkt";
 
@@ -52,15 +53,8 @@ export function panelMessage(game: Game) {
   const embed = new EmbedBuilder()
     .setTitle(`${game.emoji ? game.emoji + " " : ""}${game.name} — Mercado`)
     .setColor(0x2b9348)
-    .setDescription(
-      [
-        `Compre e venda **${UNIT_WORD[game.tradeUnit]}** com outros jogadores.`,
-        "",
-        "🛒 **COMPRO** — receba no privado os melhores vendedores para o que procura.",
-        "🏷️ **VENDO** — anuncie seu estoque e apareça para os compradores.",
-      ].join("\n"),
-    )
-    .setFooter({ text: "Negocie com segurança. Avaliações e reputação valem ponto." });
+    .setDescription(text("panel_description", { unit: UNIT_WORD[game.tradeUnit] }))
+    .setFooter({ text: text("panel_footer") });
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(buildId(MKT, "buy", game.id)).setLabel("COMPRO").setStyle(ButtonStyle.Success).setEmoji("🛒"),

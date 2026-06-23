@@ -23,6 +23,10 @@ export const config = {
   webhook: {
     port: Number(process.env.WEBHOOK_PORT || 8787),
   },
+  web: {
+    // Senha do painel web /admin (Basic Auth). Vazio = painel desligado.
+    adminToken: process.env.WEB_ADMIN_TOKEN || "",
+  },
   rates: {
     source: process.env.RATE_SOURCE || "binance",
   },

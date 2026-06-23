@@ -9,6 +9,7 @@ import { registerTicketLogging } from "./bot/market/ticketlog.js";
 import { registerVipEvents } from "./bot/vip/events.js";
 import { sweepExpiredVips } from "./services/vip.js";
 import { startWebServer } from "./web/server.js";
+import { loadTexts } from "./services/texts.js";
 import { refreshGiveawayRanking } from "./bot/giveaway/board.js";
 import { getActiveGiveaway, pendingDueForValidation, markEntry } from "./services/giveaways.js";
 import { ReferralStatus } from "@prisma/client";
@@ -56,10 +57,11 @@ async function validateGiveawayEntries() {
 }
 
 async function main() {
+  await loadTexts();
   registerVipEvents();
   if (config.giveaway.enabled) registerGiveawayEvents();
   if (config.messageLog.enabled) registerTicketLogging();
-  if (config.kick.enabled) startWebServer();
+  if (config.kick.enabled || config.web.adminToken) startWebServer();
   await client.login(config.discord.token);
 
   const sweep = async () => {

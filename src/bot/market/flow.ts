@@ -35,6 +35,7 @@ import {
 import { getGuildConfig } from "../../services/guildConfig.js";
 import { submitReview, reviewCount } from "../../services/reputation.js";
 import { isBanned, isBlocked } from "../../services/moderation.js";
+import { text } from "../../services/texts.js";
 import {
   MKT,
   panelMessage,
@@ -62,12 +63,6 @@ import { ListingType, TradeRole } from "@prisma/client";
 
 const EPH = MessageFlags.Ephemeral;
 const BANNED_MSG = "Você está impedido de usar o marketplace.";
-const VIP_PITCH = [
-  "💎 **Quer destaque?** Membros **VIP** aparecem no topo do ranking e das buscas:",
-  "• **Tier 1** — assinante na Kick",
-  "• **Tier 2** — Booster do servidor (Nitro)",
-  "Fale com a staff para ativar o seu selo.",
-].join("\n");
 
 // Cria a solicitação de negociação e avisa o vendedor. Usado tanto pelos
 // resultados do COMPRO quanto pelos cards no canal de anúncios.
@@ -231,7 +226,7 @@ registerComponent(MKT, async (i, args, action) => {
       content: [
         `✅ Anúncio publicado! Estoque **${fmtQty(qty)}** a **${game.currency} ${price.toFixed(2)}**/1k.`,
         "",
-        VIP_PITCH,
+        text("vip_pitch"),
         "",
         "Gerencie seus anúncios em `/anuncios`.",
       ].join("\n"),
@@ -389,7 +384,7 @@ registerComponent(MKT, async (i, args, action) => {
     });
     await syncListingCard(listing.id);
     await i.reply({
-      content: ["✅ Pedido de compra publicado no canal de anúncios.", "", VIP_PITCH].join("\n"),
+      content: ["✅ Pedido de compra publicado no canal de anúncios.", "", text("vip_pitch")].join("\n"),
       flags: EPH,
     });
     return;

@@ -7,6 +7,7 @@ import { verifyWebhookSignature } from "../kick/signature.js";
 import { takePending } from "../kick/pending.js";
 import { linkKick, getByKickUser } from "../services/kickLink.js";
 import { grantVip } from "../services/vip.js";
+import { adminRouter } from "./admin.js";
 
 const SUB_NEW = "channel.subscription.new";
 const SUB_RENEWAL = "channel.subscription.renewal";
@@ -14,6 +15,9 @@ const SUB_RENEWAL = "channel.subscription.renewal";
 // Sobe os endpoints HTTP da Kick (OAuth callback + webhook de sub).
 export function startWebServer(): void {
   const app = express();
+
+  // Painel web de mensagens (/admin) — protegido por WEB_ADMIN_TOKEN.
+  app.use("/admin", adminRouter);
 
   // OAuth callback do /vincular-kick.
   app.get("/kick/callback", async (req, res) => {

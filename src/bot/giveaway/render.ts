@@ -1,6 +1,7 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { Giveaway } from "@prisma/client";
 import { buildId } from "../customId.js";
+import { text } from "../../services/texts.js";
 
 const GV = "gv";
 
@@ -10,16 +11,10 @@ export function giveawayKickoffMessage(giveaway: Giveaway) {
     .setTitle(`🎉 ${giveaway.title}`)
     .setColor(0xf1c40f)
     .setDescription(
-      [
-        "Sorteio por indicação começou! Traga gente nova e concorra. 🏆",
-        "",
-        "**Como participar:**",
-        "• Clique em **🔗 Pegar meu link** e compartilhe.",
-        "• Cada pessoa nova que entrar pelo seu link conta ponto pra você.",
-        "• Acompanhe o **ranking** e o resultado em **ganhadores** nas salas da categoria.",
-        "",
-        `Regras: conta com no mínimo **${giveaway.minAccountAgeDays} dia(s)** · permanência mínima de **${giveaway.minStayDays} dia(s)**.`,
-      ].join("\n"),
+      text("giveaway_kickoff", {
+        minAccountAgeDays: giveaway.minAccountAgeDays,
+        minStayDays: giveaway.minStayDays,
+      }),
     );
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

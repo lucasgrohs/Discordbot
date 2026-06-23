@@ -182,6 +182,14 @@ model GuildConfig {
   updatedAt DateTime @updatedAt
 }
 
+// Textos do bot editáveis pelo painel web (override; fallback = default no código).
+model BotText {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 // Trilha de auditoria das ações administrativas — §1.
 model AuditLog {
   id        String   @id @default(cuid())
