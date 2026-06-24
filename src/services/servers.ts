@@ -30,6 +30,20 @@ export function addServer(input: { gameId: string; name: string; region?: string
   });
 }
 
+// Encontra um servidor do jogo pelo nome (sem diferenciar maiúsculas/espaços) ou
+// cria um novo. Usado quando o próprio vendedor/comprador digita o servidor, em vez
+// de o admin cadastrá-lo. Normaliza o nome para evitar duplicatas ("BR-01" vs "br 01").
+// Retorna null se o nome ficar vazio depois de limpo.
+export async function findOrCreateServer(gameId: string, rawName: string): Promise<GameServer | null> {
+  const name = rawName.trim().replace(/\s+/g, " ");
+  if (!name) return null;
+  const existing = await prisma.gameServer.findFirst({
+    where: { gameId, name: { equals: name, mode: "insensitive" } },
+  });
+  if (existing) return existing;
+  return prisma.gameServer.create({ data: { gameId, name } });
+}
+
 export function removeServer(id: string): Promise<GameServer> {
   return prisma.gameServer.delete({ where: { id } });
 }

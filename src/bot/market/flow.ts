@@ -10,7 +10,7 @@ import { client } from "../client.js";
 import { syncListingCard, refreshRanking } from "./board.js";
 import { getTranscript } from "../../services/transcripts.js";
 import { getGame } from "../../services/games.js";
-import { listServers, getServer } from "../../services/servers.js";
+import { listServers, getServer, findOrCreateServer } from "../../services/servers.js";
 import {
   createListing,
   getListing,
@@ -41,6 +41,7 @@ import {
   MKT,
   panelMessage,
   serverSelectRow,
+  NEW_SERVER,
   sellModal,
   buyModal,
   resultsMessage,
@@ -60,10 +61,21 @@ import {
   parseUnits,
   parseMoney,
 } from "./render.js";
-import { ListingType, TradeRole } from "@prisma/client";
+import { ListingType, TradeRole, type GameServer } from "@prisma/client";
 
 const EPH = MessageFlags.Ephemeral;
 const BANNED_MSG = "Você está impedido de usar o marketplace.";
+
+// Resolve o servidor escolhido no select ou digitado no modal. Se a pessoa escolheu
+// "Outro servidor", cria/reaproveita pelo nome digitado; caso contrário, valida que o
+// servidor selecionado existe e pertence ao jogo. Retorna null se inválido.
+async function resolveServer(gameId: string, serverArg: string, typedName: string | null): Promise<GameServer | null> {
+  if (serverArg === NEW_SERVER) {
+    return typedName ? findOrCreateServer(gameId, typedName) : null;
+  }
+  const server = await getServer(serverArg);
+  return server && server.gameId === gameId ? server : null;
+}
 
 // Cria a solicitação de negociação e avisa o vendedor. Usado tanto pelos
 // resultados do COMPRO quanto pelos cards no canal de anúncios.
@@ -167,10 +179,6 @@ registerComponent(MKT, async (i, args, action) => {
       return;
     }
     const servers = await listServers(game.id, { onlyActive: true });
-    if (servers.length === 0) {
-      await i.reply({ content: "Este jogo ainda não tem servidores cadastrados.", flags: EPH });
-      return;
-    }
     await i.reply({
       content: action === "sell" ? "Onde você quer anunciar?" : "Em qual servidor você procura?",
       components: [serverSelectRow(game, servers, action === "sell" ? "sellsrv" : "buysrv")],
@@ -195,11 +203,17 @@ registerComponent(MKT, async (i, args, action) => {
 
   // ---------- VENDO: criar anúncio ----------
   if (action === "sellmodal" && i.isModalSubmit()) {
-    const [gameId, serverId] = args;
+    const [gameId, serverArg] = args;
     const game = await getGame(gameId);
     if (!game) return;
     if (await isBanned(i.user.id)) {
       await i.reply({ content: BANNED_MSG, flags: EPH });
+      return;
+    }
+    const typedServer = serverArg === NEW_SERVER ? i.fields.getTextInputValue("server") : null;
+    const server = await resolveServer(gameId, serverArg, typedServer);
+    if (!server) {
+      await i.reply({ content: "Servidor inválido. Selecione um da lista ou digite um nome.", flags: EPH });
       return;
     }
     const qty = parseUnits(i.fields.getTextInputValue("qty"), game.baseQuantity);
@@ -214,7 +228,7 @@ registerComponent(MKT, async (i, args, action) => {
       type: ListingType.SELL,
       userId: i.user.id,
       gameId,
-      serverId,
+      serverId: server.id,
       itemName,
       quantity: qty,
       pricePer1k: price,
@@ -238,17 +252,22 @@ registerComponent(MKT, async (i, args, action) => {
 
   // ---------- COMPRO: buscar vendedores ----------
   if (action === "buymodal" && i.isModalSubmit()) {
-    const [gameId, serverId] = args;
+    const [gameId, serverArg] = args;
     const game = await getGame(gameId);
-    const server = await getServer(serverId);
-    if (!game || !server) return;
+    if (!game) return;
+    const typedServer = serverArg === NEW_SERVER ? i.fields.getTextInputValue("server") : null;
+    const server = await resolveServer(gameId, serverArg, typedServer);
+    if (!server) {
+      await i.reply({ content: "Servidor inválido. Selecione um da lista ou digite um nome.", flags: EPH });
+      return;
+    }
     const qty = parseUnits(i.fields.getTextInputValue("qty"), game.baseQuantity);
     if (!qty) {
       await i.reply({ content: "Quantidade inválida.", flags: EPH });
       return;
     }
     await i.deferReply({ flags: EPH });
-    const results = await matchSellers({ gameId, serverId, quantity: qty, sort: "recommended" });
+    const results = await matchSellers({ gameId, serverId: server.id, quantity: qty, sort: "recommended" });
     await i.editReply(resultsMessage(game, server, qty, results, "recommended"));
     return;
   }

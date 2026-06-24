@@ -15,6 +15,10 @@ import { text } from "../../services/texts.js";
 
 export const MKT = "mkt";
 
+// Valor-sentinela usado no select de servidor e no customId do modal para indicar
+// que a pessoa quer digitar um servidor novo (em vez de escolher um já cadastrado).
+export const NEW_SERVER = "novo";
+
 const CURRENCY_SYMBOL: Record<MarketCurrency, string> = { BRL: "R$", USD: "US$" };
 const UNIT_WORD: Record<TradeUnit, string> = { DIAMOND: "diamantes", GOLD: "gold", ITEM: "itens", OTHER: "unidades" };
 
@@ -64,18 +68,35 @@ export function panelMessage(game: Game) {
 }
 
 // Select de servidor (passo antes do modal). `action` = "sellsrv" | "buysrv".
+// Sempre inclui a opção "Outro servidor" para a pessoa digitar um que ainda não
+// foi cadastrado (deixa 24 vagas para os servidores existentes + 1 para "Outro").
 export function serverSelectRow(game: Game, servers: GameServer[], action: "sellsrv" | "buysrv") {
   const select = new StringSelectMenuBuilder()
     .setCustomId(buildId(MKT, action, game.id))
     .setPlaceholder("Selecione o servidor")
     .addOptions(
-      servers.slice(0, 25).map((s) => ({
+      ...servers.slice(0, 24).map((s) => ({
         label: s.name,
         value: s.id,
         description: s.region ?? undefined,
       })),
+      { label: "Outro servidor (digitar)", value: NEW_SERVER, emoji: "➕" },
     );
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+}
+
+// Linha do campo "Nome do servidor" — incluída no modal quando a pessoa escolheu
+// digitar um servidor novo.
+function serverNameRow(): ActionRowBuilder<TextInputBuilder> {
+  return new ActionRowBuilder<TextInputBuilder>().addComponents(
+    new TextInputBuilder()
+      .setCustomId("server")
+      .setLabel("Nome do servidor")
+      .setPlaceholder("ex.: BR-01")
+      .setStyle(TextInputStyle.Short)
+      .setMaxLength(50)
+      .setRequired(true),
+  );
 }
 
 export function sellModal(game: Game, serverId: string): ModalBuilder {
@@ -84,6 +105,7 @@ export function sellModal(game: Game, serverId: string): ModalBuilder {
     .setTitle(`Anunciar venda — ${game.name}`.slice(0, 45));
 
   const rows: ActionRowBuilder<TextInputBuilder>[] = [];
+  if (serverId === NEW_SERVER) rows.push(serverNameRow());
   if (game.tradeUnit === "ITEM") {
     rows.push(
       new ActionRowBuilder<TextInputBuilder>().addComponents(
@@ -113,26 +135,30 @@ export function sellModal(game: Game, serverId: string): ModalBuilder {
 }
 
 export function buyModal(game: Game, serverId: string): ModalBuilder {
-  return new ModalBuilder()
+  const modal = new ModalBuilder()
     .setCustomId(buildId(MKT, "buymodal", game.id, serverId))
-    .setTitle(`Procurar — ${game.name}`.slice(0, 45))
-    .addComponents(
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId("qty")
-          .setLabel(`Procura (x${baseLabel(game.baseQuantity)})`)
-          .setPlaceholder(`ex.: 20 = ${(20 * game.baseQuantity).toLocaleString("pt-BR")}`)
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true),
-      ),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
-          .setCustomId("price")
-          .setLabel(`Valor por 1k que paga (${game.currency}, opcional)`)
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false),
-      ),
-    );
+    .setTitle(`Procurar — ${game.name}`.slice(0, 45));
+
+  const rows: ActionRowBuilder<TextInputBuilder>[] = [];
+  if (serverId === NEW_SERVER) rows.push(serverNameRow());
+  rows.push(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("qty")
+        .setLabel(`Procura (x${baseLabel(game.baseQuantity)})`)
+        .setPlaceholder(`ex.: 20 = ${(20 * game.baseQuantity).toLocaleString("pt-BR")}`)
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true),
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("price")
+        .setLabel(`Valor por 1k que paga (${game.currency}, opcional)`)
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false),
+    ),
+  );
+  return modal.addComponents(...rows.slice(0, 5));
 }
 
 const SORT_LABEL: Record<SortMode, string> = {
